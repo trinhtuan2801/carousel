@@ -1,92 +1,143 @@
-import { Children, cloneElement, useMemo, useState, useEffect, useRef } from 'react'
+import {
+  Children,
+  useMemo,
+  useState,
+  useEffect,
+  useRef,
+  PropsWithChildren,
+} from "react";
+import { CarouselProps } from "./types";
 
-interface Props {
-  children: React.ReactNode
-  spacing: number
-  itemShown: number
-  autoScroll?: boolean
-}
-
-const Carousel: React.FunctionComponent<Props> = ({
+const Carousel: React.FunctionComponent<PropsWithChildren<CarouselProps>> = ({
   children,
+  spacing = 0,
   itemShown,
-  spacing,
-  autoScroll
+  index: forcedIndex,
+  autoScroll,
+  autoScrollInterval = 2,
+  CustomNavigator,
+  ContainerStyles,
 }) => {
-
-  const carouselRef = useRef<HTMLDivElement>(null)
-  const [carouselWidth, setCarouselWidth] = useState(0)
-  const childrenArray = Children.toArray(children)
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const [carouselWidth, setCarouselWidth] = useState(0);
+  const childrenArray = Children.toArray(children);
 
   const itemWidth = useMemo(() => {
-    const gaps = itemShown - 1
-    const gapSpaces = gaps * spacing
-    return `(100% - ${gapSpaces}px) / ${itemShown}`
-  }, [spacing, itemShown])
+    const gaps = itemShown - 1;
+    const gapSpaces = gaps * spacing;
+    return (carouselWidth - gapSpaces) / itemShown;
+  }, [spacing, itemShown, carouselWidth]);
 
-  const [index, setIndex] = useState(0)
-  const pages = Math.ceil(childrenArray.length / itemShown)
+  const [index, setIndex] = useState(0);
+  const pages = Math.ceil(childrenArray.length / itemShown);
 
   useEffect(() => {
     const onChange = () => {
-      setCarouselWidth(carouselRef.current?.clientWidth ?? 0)
-    }
-    onChange()
-    window.addEventListener('resize', onChange)
-    return () => { window.removeEventListener('resize', onChange) }
-  }, [])
+      setCarouselWidth(carouselRef.current?.clientWidth ?? 0);
+    };
+    onChange();
+    window.addEventListener("resize", onChange);
+    return () => {
+      window.removeEventListener("resize", onChange);
+    };
+  }, []);
+
+  const onClickPrev = () => {
+    setIndex((prev) => {
+      if (prev <= 0) return pages - 1;
+      else return prev - 1;
+    });
+  };
+
+  const onClickNext = () => {
+    setIndex((prev) => {
+      if (prev >= pages - 1) return 0;
+      else return prev + 1;
+    });
+  };
 
   useEffect(() => {
     if (carouselRef.current) {
-      carouselRef.current.scroll({
-        left: 315.442,
-        behavior: 'smooth'
-      })
+      const jumpedItems = Math.floor(itemShown * index);
+      const jumpedGaps = jumpedItems;
+      const jumpedLength = jumpedItems * itemWidth + jumpedGaps * spacing;
+      carouselRef.current.scrollTo({
+        left: jumpedLength,
+        behavior: "smooth",
+      });
     }
-  }, [])
-
-  const next = () => {
-    setIndex(prev => prev + 1)
-  }
-
-  const prev = () => {
-    setIndex(prev => prev - 1)
-  }
+  }, [index, itemWidth, carouselWidth]);
 
   useEffect(() => {
-    console.log(index, itemWidth, carouselWidth)
-  }, [index, itemWidth, carouselWidth])
+    if (!autoScroll) return;
+    const timeout = setTimeout(() => {
+      onClickNext();
+    }, autoScrollInterval * 1000);
+
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, [index]);
+
+  useEffect(() => {
+    if (forcedIndex !== undefined) setIndex(forcedIndex);
+  }, [forcedIndex]);
 
   return (
     <>
       <div
         style={{
-          overflow: 'hidden',
-          width: '100%',
-          display: 'flex',
-          columnGap: spacing,
-          height: 'fit-content'
+          width: "100%",
+          position: "relative",
+          height: "200px",
+          ...ContainerStyles,
         }}
-        ref={carouselRef}
       >
-        {Children.map(childrenArray, (child, index) => {
-          return (
-            <div
-              key={index}
-              style={{
-                minWidth: `calc(${itemWidth})`,
-                width: `calc(${itemWidth})`
-              }}
-            >
-              {child}
-            </div>
-          )
-        })}
+        <div
+          style={{
+            overflow: "hidden",
+            width: "100%",
+            display: "flex",
+            columnGap: `${spacing}px`,
+            height: "100%",
+          }}
+          ref={carouselRef}
+        >
+          {Children.map(childrenArray, (child, index) => {
+            return (
+              <div
+                key={index}
+                style={{
+                  minWidth: `${itemWidth}px`,
+                  width: `${itemWidth}px`,
+                }}
+              >
+                {child}
+              </div>
+            );
+          })}
+        </div>
+
+        {CustomNavigator && (
+          <CustomNavigator
+            index={index}
+            setIndex={(index) => {
+              if (index <= -1) setIndex(pages - 1);
+              else if (index >= pages) setIndex(0);
+              else setIndex(index);
+            }}
+          />
+        )}
+
+        {!CustomNavigator && (
+          <>
+            <button onClick={onClickPrev}>Prev</button>
+            <button onClick={onClickPrev}>Next</button>
+          </>
+        )}
       </div>
-      <button>Prev</button>
-      <button>Next</button>
     </>
   );
-}
+};
 
 export default Carousel;
